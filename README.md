@@ -1,5 +1,10 @@
 # customer-feedback-serverless
 
+## Validate 
+```bash
+sam validate
+```
+
 ## Deploy the sample application
 
 To build and deploy your application for the first time, run the following in your shell:
