@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'customer-feedback-serverless
+
+  Sample SAM Template for customer-feedback-serverless
+
+  '
+Globals:
+  Function:
+    Timeout: 20
+    Tracing: Active
+  Api:
+    TracingEnabled: true
+Resources:
+  ClosedSRBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+  CustomerMsgTopic:
+    Type: AWS::SNS::Topic
+  ClosedSRFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ClosedSRFunction
+      Handler: com.zubayear.customerfeedback.lambdas.ClosedSRLambda::uploadToS3
+      Policies:
+      - S3ReadPolicy:
+          BucketName:
+            Fn::Sub: ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - CustomerMsgTopic
+            - TopicName
+      Runtime: java11
+      Architectures:
+      - x86_64
+      MemorySize: 512
+      Environment:
+        Variables:
+          TOPIC_NAME:
+            Ref: CustomerMsgTopic
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: ClosedSRBucket
+            Events: s3:ObjectCreated:*
+    Metadata:
+      SamResourceId: ClosedSRFunction
+  CustomerMsgFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: CustomerMsgFunction
+      Handler: com.zubayear.customerfeedback.lambdas.CustomerMsgLambda::saveMsg
+      Runtime: java11
+      Architectures:
+      - x86_64
+      MemorySize: 512
+      Events:
+        SNSEvent:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: CustomerMsgTopic
+    Metadata:
+      SamResourceId: CustomerMsgFunction

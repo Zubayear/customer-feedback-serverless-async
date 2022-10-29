@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  customer-feedback-serverless
+
+  Sample SAM Template for customer-feedback-serverless
+
+Globals:
+  Function:
+    Timeout: 20
+    Tracing: Active
+    # RunTime: java11
+    # Architectures:
+    #   - x86_64
+    # MemorySize: 512
+  Api:
+    TracingEnabled: True
+
+
+Resources:
+  ClosedSRBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+  
+  CustomerMsgTopic:
+    Type: AWS::SNS::Topic
+  
+  ClosedSRFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: customerfeedback
+      Handler: com.zubayear.customerfeedback.lambdas.ClosedSRLambda::uploadToS3
+      Policies: # lambda function should be able to read from s3
+        - S3ReadPolicy: # json data read policy
+            BucketName: !Sub ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+        - SNSPublishMessagePolicy: # msg publish policy
+            TopicName: !GetAtt CustomerMsgTopic.TopicName
+      Runtime: java11
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Environment:
+        Variables:
+          TOPIC_NAME: !Ref CustomerMsgTopic
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref ClosedSRBucket
+            Events: s3:ObjectCreated:*
+
+  CustomerMsgFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: customerfeedback
+      Handler: com.zubayear.customerfeedback.lambdas.CustomerMsgLambda::saveMsg
+      Runtime: java11
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Events: # this lambda will be triggered by SNSEvent
+        SNSEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref CustomerMsgTopic # as soon as we get msg in this topic this lambda will be triggered
